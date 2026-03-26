@@ -1,0 +1,149 @@
+---
+title: 'Seminar 9 (Week 10), Audio and Image Data'
+author: "Melissa Sands"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setting Up
+
+## Functions
+
+First, we load some re-usable functions for our activity. You can inspect, edit, and add to the functions by opening the relevant .R script. But for now, we can just source them.
+
+```{r functions}
+source("R//functions//functions.R")
+```
+
+Let's now load the necessary libraries for this activity:
+
+```{r libraries}
+# start by checking for and installing packages:
+package_check(c("devtools", "ggplot2", "dplyr", "stringr", "tidylog", "rvest", "tuneR", "seewave", "imager"))
+
+# devtools for installing from github
+# ggplot2 for visualisation
+# dplyr for data manipulation
+# stringr for string manipulation
+# tidylog to keep track of our data manipulation
+# rvest for web scraping
+# tuneR for audio loading, analysis, etc.
+# seewave for audio visualisation
+# imager for image loading, analysis, etc. Also works for video, but we won't do that today.
+# magick -- we won't call this but it is an alternative suite to imager, similar types of tools, and interchanageable/complementary
+
+```
+
+# Audio Data
+
+## Downloading and Ingesting Data
+
+```{r audio_download}
+# set url of audio file:
+url <- "https://s3.amazonaws.com/RE-Warehouse/w/winston_churchill_speeches_and_radio_broadcasts_1940-06-04_we_shall_never_surrender.mp3"
+
+# extract the file name from the url:
+file_name <- basename(url)
+img_grabber(file_name, url) # check the functions.R file to see what this function does
+
+```
+
+Now let's ingest the audio file:
+
+```{r audio_ingest}
+# ingest the audio file:
+churchill <- readMP3(paste0("data/", file_name))
+
+# look at it
+churchill
+
+```
+
+Now let's clip the audio to a smaller segment, so we can analyse it:
+
+```{r audio_clip}
+# clip the audio file to a 30 second segment
+churchill_clip <- extractWave(churchill, from=670, to=700, xunit='time')
+
+# play the clip -- you may need to authorize/download something here, depending on your system. 
+tuneR::play(churchill_clip)
+     
+```
+
+And now, conduct some visualisation:
+
+```{r audio_viz}
+# visualise amplitudes or waveform (loudness)
+tibble(seconds = (1:length(churchill_clip@left))/churchill_clip@samp.rate,
+             amplitude = churchill_clip@left) %>%
+  ggplot(aes(x = seconds, y = amplitude)) +   
+    geom_line() +
+    theme_minimal()
+
+# create a spectrogram (frequency and amplitude)
+seewave::spectro(churchill_clip)
+
+# closer inspection:
+churchill_clip_1s <- extractWave(churchill_clip, from=1, to=2, xunit='time')
+seewave::spectro(churchill_clip_1s)
+
+```
+
+# Image Data
+
+Let's turn to image data. We will start by by just exploring image data a little. 
+
+First, let's grab some images from the web. This can take a while if we have many images, so start with a small set:
+
+```{r image_ingestion}
+# A couple of political images from Wikimedia Commons.
+# These are stable, openly licensed direct image URLs.
+urls <- c(
+  "https://upload.wikimedia.org/wikipedia/commons/4/49/Occupy_Wall_Street_Crowd_Size_2011_Shankbone.JPG",   # Occupy Wall Street crowd, NYC 2011
+  "https://upload.wikimedia.org/wikipedia/commons/3/3d/View_of_Crowd_at_1963_March_on_Washington.jpg"     # March on Washington crowd, 1963
+)
+
+# load the images into R as a list:
+img_lst <- list()
+
+for(i in seq_along(urls)){
+  img_lst[[i]] <- try(load.image(urls[i]))
+}
+
+# remove any that failed to load:
+img_lst <- img_lst[!sapply(img_lst, inherits, "try-error")]
+
+# how many loaded successfully?
+length(img_lst)
+```
+
+Let's take a look at our images. 
+
+```{r image_inspection}
+# plot all images to get an overview:
+for(i in seq_along(img_lst)) plot(img_lst[[i]], main = paste("Image", i), axes = FALSE)
+```
+
+```{r grayscale_conversion}
+# image 1 is in colour; convert to grayscale:
+img1_grayscale <- grayscale(img_lst[[1]])
+plot(img1_grayscale)
+
+```
+
+```{r image_analysis}
+# conduct edge detection (how pixel intensity changes from pixel to pixel within a small area)
+# edge detection relies on image gradients, which imager returns via:
+gr1 <- imgradient(img_lst[[2]],"xy")
+gr1
+plot(gr1, layout="row")
+
+```
+
+# Self-Directed Task:
+
+Find either an interesting audio clip or an interesting image (or set of images) online. Download the files, ingest them, and do some exploratory analyses. 
